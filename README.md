@@ -1,235 +1,72 @@
-# The Cryspen HACL Packages
+# CFG Boosting Example - Cryspen HACL HMAC Routines
 
-This repository contains ready-to-use crypto packages developed by [Cryspen] on top of [HACL*].
-In particular, it contains a portable C crypto library that selects optimized implementations for each platform,
-as well as Rust, OCaml, and JavaScript bindings for this library.
+> [!NOTE]
+> See the README.orig.md file in this directory to read the original file describing the Cryspen HACL Packages project.
 
-Currently, we are in the process of adding more usable APIs, [providing extensive documentation](https://cryspen.com/hacl-packages/), and further optimizing the algorithms.
+This branch uses the Cryspen HACL Packages repository (https://github.com/cryspen/hacl-packages) as a target for CFG boosting.
+Specifically, we manually instrumented the routines in `src/Hacl_HMAC.c` to include a unique assembly preamble bit pattern as a preamble to each basic block (in source).
+We limited our modifications to code within `src/Hacl_HMAC.c`.
+Functions called from within this file remain unmodified.
 
-## What is HACL\* and why should you use HACL Packages?
+Since instrumentation at the IR-level would facilitate an automated approach, we also took care to investigate the preprocessed version of src/Hacl_HMAC.c to ensure we didn't miss any (consequential) basic blocks hidden within macros.
+Our investigation validated that no such basic blocks exist in the target source file.
+You can verify our findings by looking at either the preprocessed source file (`make Hacl_HMAC.pp.c`) or src/Hacl_HMAC.ppsource.c which stores our instrumentation of the preprocessed source file.
 
-[HACL*] is a collection of high-assurance cryptographic algorithms developed as part of [Project Everest].
-It includes source code written in [F*], generated C code, verified assembly code from the [Vale] project, and an agile multiplexed cryptographic provider called [EverCrypt].
-As such, the full HACL\* repository contains many software artifacts and a complicated build system that can be intimidating to a crypto developer who simply wishes to use verified crypto.
+## Building
 
-## Quickstart
-
-### Install build dependencies
-
-We need the following dependencies ...
-
-- [cmake] (3.17 or newer)
-- [ninja] (1.10 or newer)
-- [python] (3.6 or newer)
-- [clang] (7 or newer) or [gcc] (7 or newer)
-
-Depending on your system you can install them as follows (click to expand) ...
-
-<details>
-  <summary><b>Arch Linux</b></summary>
-
-```sh
-$ sudo pacman -S cmake ninja python
-
-# Either of ...
-$ sudo pacman -S clang
-$ sudo pacman -S gcc
-```
-</details>
-
-<details>
-  <summary><b>Fedora</b></summary>
-  
-```sh
-$ sudo dnf install cmake ninja-build python3
-
-# Either of ...
-$ sudo dnf install clang
-$ sudo dnf install gcc
-```
-</details>
-
-<details>
-  <summary><b>Ubuntu</b></summary>
-  
-```sh
-$ sudo apt install cmake ninja-build python3
-
-# Either of ...
-$ sudo apt install clang
-$ sudo apt install gcc
-```
-</details>
-
-<details>
-  <summary><b>macOS</b></summary>
-
-```sh
-$ brew install cmake ninja python
-
-# Either of ...
-$ brew install llvm
-$ brew install gcc
-```
-</details>
-
-## Build (and test) HACL Packages
-
-You can run ...
-
-```sh
-$ ./mach build --test
-```
-
-... to build HACL Packages and run the tests. All actions are driven by [mach]. See `./mach --help` for details.
-
-## Platform support
-
-The HACL Packages are supported based on the following tiers.
-
-### Tier 1
-
-Tier 1 targets are guaranteed to work. These targets have automated testing to
-ensure that changes do not break them.
-
-- [x] x86_64 Linux (x86_64-unknown-linux-gnu)
-- [x] x86 Linux (i686-unknown-linux-gnu)
-- [x] x86_64 macOS (x86_64-apple-darwin)
-- [x] x86_64 Windows
-  - [x] x86_64-pc-windows-msvc
-  - [x] x86_64-pc-windows-clang
-- [x] x86 Windows (i686-pc-windows-msvc)
-
-### Tier 2
-
-Tier 2 targets are guaranteed to build.
-These targets have automated builds to ensure that changes do not break the
-builds. However, not all of them are always tested.
-
-- [x] arm64 macOS (aarch64-apple-darwin)
-- [x] arm64 Linux (aarch64-unknown-linux-gnu)
-- [x] arm64 Android (aarch64-linux-android)
-- [x] arm64 iOS (aarch64-apple-ios)
-- [x] s390x z14 Linux (s390x-unknown-linux-gnu)
-
-### Tier 3
-
-Tier 3 targets are supported by the code but there are no automated checks and
-there is no guarantee that they work.
-
-- ARMv7 Android (aarch64arm-linux-androideabi)
-- arm64 iOS Simulator (aarch64-apple-ios-sim)
-- x86_64 iOS (x86_64-apple-ios)
-- PowerPC
-- FreeBSD / x64
-
-## Compiler support
-
-<!-- When using the `c89` edition of HACL GCC 4.8 and up are supported.
-In any other case a modern C compiler is expected. -->
-
-A modern C compiler is expected.
-
-## Algorithms
-
-The following tables gives an overview over the algorithms supported by the HACL
-packages.
-
-| Family               | Algorithm         | Support                                 |
-| -------------------- | ----------------- | --------------------------------------- |
-| AEAD                 | AES-GCM 128       | AES-NI & CLMUL (x86 only)               |
-| AEAD                 | AES-GCM 256       | AES-NI & CLMUL (x86 only)               |
-| AEAD                 | Chacha20-Poly1305 | Portable \| vec128 \| vec256            |
-| ECDH                 | Curve25519        | Portable \| BMI2 & ADX                  |
-| ECDH                 | P-256             | Portable                                |
-| Signature            | Ed25519           | Portable                                |
-| Signature            | ECDSA P-256r1     | Portable                                |
-| Signature            | ECDSA P-256k1     | Portable                                |
-| Signature            | RSA-PSS           | Portable                                |
-| Hash                 | SHA2-224          | Portable \| SHAEXT                      |
-| Hash                 | SHA2-256          | Portable \| SHAEXT                      |
-| Hash                 | SHA2-384          | Portable                                |
-| Hash                 | SHA2-512          | Portable                                |
-| Hash                 | SHA3              | Portable                                |
-| Hash                 | Blake2            | Portable \| vec128 \| vec256            |
-| Key Derivation       | HKDF              | Portable (depends on hash)              |
-| Symmetric Encryption | Chacha20          | Portable \| vec128 \| vec256            |
-| Symmetric Encryption | AES 128           | AES-NI & CLMUL (x86 only)               |
-| Symmetric Encryption | AES 256           | AES-NI & CLMUL (x86 only)               |
-| MAC                  | HMAC              | Portable (depends on hash)              |
-| MAC                  | Poly1305          | Portable \| vec128 \| vec256 \| x64 ASM |
-
-## Testing
-
-Testing is done with [gtest] and requires a C++11 compiler (or C++20 MSVC).
-
-### Measure Test Coverage
-
-Test coverage in HACL Packages can be measured with ...
-
-```sh
-./mach build --tests --coverage
-./mach test --coverage
-./tools/coverage.sh
-```
-
-Note that only clang is supported as a compiler and you may get an error ...
+The code should build without error using the following steps.
 
 ```
-cc: error: unrecognized command-line option ‘-fprofile-instr-generate’; did you mean ‘-fprofile-generate’?
+$ make
+cc -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal src/Hacl_HMAC.c driver.c src/Hacl_Hash_SHA2.c src/Hacl_Hash_SHA1.c src/Hacl_Hash_Blake2s.c src/Hacl_Hash_Blake2b.c src/Lib_Memzero0.c -o orig
+cc -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal src/Hacl_HMAC.srcboost.c driver.c cfgboost.h src/Hacl_Hash_SHA2.c src/Hacl_Hash_SHA1.c src/Hacl_Hash_Blake2s.c src/Hacl_Hash_Blake2b.c src/Lib_Memzero0.c -o srcboost
+cc -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal src/Hacl_HMAC.ppboost.c driver.c cfgboost.h src/Hacl_Hash_SHA2.c src/Hacl_Hash_SHA1.c src/Hacl_Hash_Blake2s.c src/Hacl_Hash_Blake2b.c src/Lib_Memzero0.c -o ppboost
 ```
 
-... when your default compiler is not clang.
-In this case, try to set the `CC` and `CXX` environment variables accordingly ...
+## Running
 
-```sh
-export CC=clang
-export CXX=clang++
+We also include a driver to facilitate dynamic studies of boosting effects.
+The resulting executables are command-line tools that compute a hash of data read from standard input.
+If you launch the tool without parameters, they will print usage information.
+
+```
+$ ./srcboost 
+Usage: ./srcboost [HASH_ALG] [length]
+
+Parameters:
+  HASH_ALG  Name of the hash algorithm
+             sha1|sha2_256|sha2_384|sha2_512|blake2s|blake2b
+
+  length    Number of data bytes to read from STDIN
+
 ```
 
-Furthermore, additional tools are required to measure (and view) test coverage.
+For example, use the following command to compute an HMAC SHA1 hash of a 128 byte length zero buffer.
 
-Make sure you have `lcov` and `genhtml`.
-
-For Ubuntu these can be installed via ...
-
-```sh
-$ sudo apt install lcov
+```
+$ cat /dev/zero | ./srcboost sha1 128
+Hash:0503eec74a215fd90b5e613930bbeacd891ae163
 ```
 
-When everything went well you should be able to view the coverage reports with, e.g., ...
+The execution above will include a boosting signal in assembly at the beginning of each source basic block.
+Use the `./orig` binary to run dynamic experiments against an unmodified code for comparison.
 
-```sh
-firefox build/Debug/coverage/full/html/index.html
+## Customizing the Instrumentation
+
+If you would like to customize the assembly preamble generated for each basic block, modify the `src/cfgboost.h` file.
+That file contains the `cfgboost()` described by the following pseudocode.
+
+```
+void cfgboost(int id)
+{
+    for (int i = 0; i < max_boost_bits; ++i) {
+        if (id & 0x1) generate_bit1_asm_pattern();
+        else          generate_bit0_asm_pattern();
+        id >>= 1;
+    }
+    return;
+}
 ```
 
-### Dependencies
-
-Tests require the [nlohmann_json] package to read json test files.
-CMake takes care of pulling and building the package.
-
-## License
-
-HACL packages are licensed under either of
-
-- [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
-- [MIT license](http://opensource.org/licenses/MIT)
-
-at your option.
-
-[//]: # "links"
-[cryspen]: https://www.cryspen.com/
-[cmake]: https://cmake.org/
-[ninja]: https://ninja-build.org/
-[clang]: https://clang.llvm.org/
-[gcc]: https://gcc.gnu.org/
-[mach]: ./mach
-[gtest]: https://google.github.io/googletest/
-[nlohmann_json]: https://github.com/nlohmann/json
-[hacl*]: https://hacl-star.github.io
-[f*]: https://fstar-lang.org
-[vale]: https://hacl-star.github.io/HaclValeEverCrypt.html
-[evercrypt]: https://hacl-star.github.io/HaclValeEverCrypt.html
-[status]: https://img.shields.io/badge/status-beta-orange.svg?style=for-the-badge
-[project everest]: https://project-everest.github.io/
-[python]: https://www.python.org/
+The real cfgboost() function generates the assembly pattern directly instead of calling distinct `generate_bitX_asm_pattern()` functions.
+Modifying the assembly within that function and issuing a `make` command should generate executibles with the updated basic block preamble patterns.

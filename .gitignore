@@ -27,3 +27,8 @@ rust/.c
 .idea
 cmake-build-debug
 
+*~
+Hacl_HMAC.pp.c
+orig
+ppboost
+srcboost
