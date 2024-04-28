@@ -53,7 +53,7 @@ Use the `./orig` binary to run dynamic experiments against an unmodified code fo
 
 ## Customizing the Instrumentation
 
-If you would like to customize the assembly preamble generated for each basic block, modify the `src/cfgboost.h` file.
+If you would like to customize the assembly preamble generated for each basic block, modify the `cfgboost.h` file.
 That file contains the `cfgboost()` described by the following pseudocode.
 
 ```
