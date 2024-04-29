@@ -32,3 +32,4 @@ Hacl_HMAC.pp.c
 orig
 ppboost
 srcboost
+cfgboost.h

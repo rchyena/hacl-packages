@@ -53,20 +53,7 @@ Use the `./orig` binary to run dynamic experiments against an unmodified code fo
 
 ## Customizing the Instrumentation
 
-If you would like to customize the assembly preamble generated for each basic block, modify the `cfgboost.h` file.
-That file contains the `cfgboost()` described by the following pseudocode.
-
-```
-void cfgboost(int id)
-{
-    for (int i = 0; i < max_boost_bits; ++i) {
-        if (id & 0x1) generate_bit1_asm_pattern();
-        else          generate_bit0_asm_pattern();
-        id >>= 1;
-    }
-    return;
-}
-```
-
-The real cfgboost() function generates the assembly pattern directly instead of calling distinct `generate_bitX_asm_pattern()` functions.
-Modifying the assembly within that function and issuing a `make` command should generate executibles with the updated basic block preamble patterns.
+If you would like to customize the assembly preamble generated for each basic block, modify the `mkboost.py` file.
+That script is used to generate `cfgboost.h` which is ultimately responsible for generating the basic block assembly preamble.
+Specifically, the `bit0` and `bit1` lists should hold the sequence of valid assembly instructions used to signify either a 0 or 1 bit, respectively.
+Issuing a `make` command after modification should generate executibles with the updated basic block preamble patterns.

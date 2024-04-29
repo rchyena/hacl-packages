@@ -15,6 +15,9 @@ srcboost: src/Hacl_HMAC.srcboost.c driver.c cfgboost.h
 ppboost: src/Hacl_HMAC.ppboost.c driver.c cfgboost.h
 	${CC} ${C_FLAGS} $^ ${SOURCE_DEPS} -o $@
 
+cfgboost.h: mkboost.py
+	python3 $< > $@
+
 Hacl_HMAC.pp.c: src/Hacl_HMAC.c
 	${CC} -E ${C_FLAGS} $^ -o $@
 
@@ -62,4 +65,4 @@ test: all
 	@cat /dev/zero | ./ppboost blake2b 4096
 
 clean:
-	rm -rf ${TARGETS}
+	rm -f ${TARGETS} cfgboost.h Hacl_HMAC.pp.c
