@@ -8,10 +8,6 @@ Specifically, we manually instrumented the routines in `src/Hacl_HMAC.c` to incl
 We limited our modifications to code within `src/Hacl_HMAC.c`.
 Functions called from within this file remain unmodified.
 
-Since instrumentation at the IR-level would facilitate an automated approach, we also took care to investigate the preprocessed version of src/Hacl_HMAC.c to ensure we didn't miss any (consequential) basic blocks hidden within macros.
-Our investigation validated that no such basic blocks exist in the target source file.
-You can verify our findings by looking at either the preprocessed source file (`make Hacl_HMAC.pp.c`) or src/Hacl_HMAC.ppsource.c which stores our instrumentation of the preprocessed source file.
-
 ## Building
 
 The code should build without error using the following steps.
@@ -19,8 +15,9 @@ The code should build without error using the following steps.
 ```
 $ make
 cc -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal src/Hacl_HMAC.c driver.c src/Hacl_Hash_SHA2.c src/Hacl_Hash_SHA1.c src/Hacl_Hash_Blake2s.c src/Hacl_Hash_Blake2b.c src/Lib_Memzero0.c -o orig
-cc -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal src/Hacl_HMAC.srcboost.c driver.c cfgboost.h src/Hacl_Hash_SHA2.c src/Hacl_Hash_SHA1.c src/Hacl_Hash_Blake2s.c src/Hacl_Hash_Blake2b.c src/Lib_Memzero0.c -o srcboost
-cc -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal src/Hacl_HMAC.ppboost.c driver.c cfgboost.h src/Hacl_Hash_SHA2.c src/Hacl_Hash_SHA1.c src/Hacl_Hash_Blake2s.c src/Hacl_Hash_Blake2b.c src/Lib_Memzero0.c -o ppboost
+cc -S -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal src/Hacl_HMAC.c
+cat Hacl_HMAC.s | python3 mkboost.py > Hacl_HMAC.boosted.s
+cc -O2 -I . -I include -I karamel/include -I karamel/krmllib/dist/minimal Hacl_HMAC.boosted.s driver.c src/Hacl_Hash_SHA2.c src/Hacl_Hash_SHA1.c src/Hacl_Hash_Blake2s.c src/Hacl_Hash_Blake2b.c src/Lib_Memzero0.c -o asmboost
 ```
 
 ## Running
@@ -30,8 +27,8 @@ The resulting executables are command-line tools that compute a hash of data rea
 If you launch the tool without parameters, they will print usage information.
 
 ```
-$ ./srcboost 
-Usage: ./srcboost [HASH_ALG] [length]
+$ ./asmboost
+Usage: ./asmboost [HASH_ALG] [length]
 
 Parameters:
   HASH_ALG  Name of the hash algorithm
@@ -44,7 +41,7 @@ Parameters:
 For example, use the following command to compute an HMAC SHA1 hash of a 128 byte length zero buffer.
 
 ```
-$ cat /dev/zero | ./srcboost sha1 128
+$ cat /dev/zero | ./asmboost sha1 128
 Hash:0503eec74a215fd90b5e613930bbeacd891ae163
 ```
 
@@ -54,6 +51,36 @@ Use the `./orig` binary to run dynamic experiments against an unmodified code fo
 ## Customizing the Instrumentation
 
 If you would like to customize the assembly preamble generated for each basic block, modify the `mkboost.py` file.
-That script is used to generate `cfgboost.h` which is ultimately responsible for generating the basic block assembly preamble.
-Specifically, the `bit0` and `bit1` lists should hold the sequence of valid assembly instructions used to signify either a 0 or 1 bit, respectively.
-Issuing a `make` command after modification should generate executibles with the updated basic block preamble patterns.
+That script will insert the appropriate assembly preamble before the basic blocks it detects.
+Specifically, the `bit0` and `bit1` lists should hold the sequence of valid assembly instructions for signifying either a 0 or 1 bit, respectively.
+Issuing `make` after modification should generate a new `asmboost` program with the updated basic block preamble patterns.
+
+## Testing
+
+You can use `make test` to verify that `asmboost` does not violate correctness properties of the original code.
+For instance, if we use a 2-byte nop (i.e., "xchg %ax,%ax") as a boosting signal, no differences will be detected when running a test.
+
+```
+$ make test
+     Original sha1 Hash:11d3b3a82660cf071e40796f8c0b2049d6de64cd
+    Src Boost sha1 Hash:11d3b3a82660cf071e40796f8c0b2049d6de64cd
+ Original sha2_256 Hash:4e479a90932f447db5f998bfeb9e703ab65833b56deac623e2d5fbd83376c439
+Src Boost sha2_256 Hash:4e479a90932f447db5f998bfeb9e703ab65833b56deac623e2d5fbd83376c439
+ Original sha2_384 Hash:86c959c1ae098069225c38781b0acd86ddef0510f662e063c74813a2bcf6d2c2543dd4f613a54ebb60af6c7b7c7c2585
+Src Boost sha2_384 Hash:86c959c1ae098069225c38781b0acd86ddef0510f662e063c74813a2bcf6d2c2543dd4f613a54ebb60af6c7b7c7c2585
+ Original sha2_512 Hash:9fff6fbef99f3d144b3afb5f5041ed2d7c8c6f33bb507805c82bfbd84cf1b1dd8e4d7fc7df15149219d601a0cb794d1935f63c19f428c6ac675a0b376718da8f
+Src Boost sha2_512 Hash:9fff6fbef99f3d144b3afb5f5041ed2d7c8c6f33bb507805c82bfbd84cf1b1dd8e4d7fc7df15149219d601a0cb794d1935f63c19f428c6ac675a0b376718da8f
+  Original blake2s Hash:f387e8299ad805fc8b7a
+ Src Boost blake2s Hash:f387e8299ad805fc8b7a
+  Original blake2b Hash:f6bea184a0d8315414672d08842ce815e7d1c92d169ed308a02ec404dd4f4f3c231d3476a2efe1cc37798bdd07104744a482915e54370102632b9aa1
+ Src Boost blake2b Hash:f6bea184a0d8315414672d08842ce815e7d1c92d169ed308a02ec404dd4f4f3c231d3476a2efe1cc37798bdd07104744a482915e54370102632b9aa1
+```
+
+However, if we use "mulb 0x1" as a boosting signal, that instruction modifies the flags register, ultimately affecting code correctness.
+This correctness modifying change may be observed using `make test`.
+
+```
+$ make test
+     Original sha1 Hash:11d3b3a82660cf071e40796f8c0b2049d6de64cd
+    Src Boost sha1 make: *** [Makefile:25: test] Error 139
+```

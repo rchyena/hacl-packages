@@ -28,8 +28,7 @@ rust/.c
 cmake-build-debug
 
 *~
-Hacl_HMAC.pp.c
-orig
-ppboost
-srcboost
-cfgboost.h
+/orig
+/asmboost
+/Hacl_HMAC.s
+/Hacl_HMAC.boosted.s

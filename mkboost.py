@@ -1,6 +1,21 @@
 #!/usr/bin/env python3
 
+import sys
+
+# 1 byte nop: "nop",
+# 2 byte nop: "xchg %ax,%ax",
+# loud instr: "mulb 0x1",
+
 maxb = 7
+bit1 = [
+    "xchg %ax,%ax",
+    "xchg %ax,%ax",
+    "xchg %ax,%ax",
+    "xchg %ax,%ax",
+    "xchg %ax,%ax",
+]
+# Warning: This instruction modifies flags and will break
+#          the resulting binary.
 bit1 = [
     "mulb 0x1",
     "mulb 0x1",
@@ -16,53 +31,27 @@ bit0 = [
     "nop",
 ]
 
-print("""
-#ifndef __CFGBOOST_H__
-#define __CFGBOOST_H__
+def main():
+    i = 0
+    for line in sys.stdin:
+        if '.cfi_endproc' in line:
+            add_boost(i)
+            i += 1
+        print(line, end='')
+        if line.startswith('\tj') or '.cfi_startproc' in line:
+            add_boost(i)
+            i += 1
 
-#define cfgboost(x) helper_boost(x)
-#define helper_boost(x) BOOST_##x
-""")
-
-for n in range(128):
-    print(f'#define BOOST_{n} do {{ asm volatile (', end='')
-    for i in range(maxb):
-        bitp = bit1 if n & 1 else bit0
+def add_boost(n):
+    i = n
+    print(f'# Start BB ID {n}')
+    for x in range(maxb):
+        bitp = bit1 if i & 1 else bit0
         for a in bitp:
-            print(f' "{a}\\n"', end='')
-        n = n >> 1
-    print(' "xchg %ax,%ax \\n"); } while(0)')
+            print(f'\t{a}')
+        print('# ---')
+        i = i >> 1
+    print(f'# End BB ID {n}')
 
-print('''
-
-#define BOOST_ID_BITS 7
-
-__attribute__((always_inline)) inline
-void dyn_cfgboost(int id)
-{
-    int i = 0;
-    while (i < BOOST_ID_BITS) {
-        if (id & 0x1) {
-            /* Assembly for sending a bit "1" boost signal. */
-            asm volatile
-                (
-                    "xchg %ax,%ax \\n"
-                    ""
-                );
-        }
-        else {
-            /* Assembly for sending a bit "0" boost signal. */
-            asm volatile
-                (
-                    "nop \\n"
-                    ""
-                );
-        }
-        id >>= 1;
-        ++i;
-    }
-    return;
-}
-
-#endif
-''')
+if __name__ == '__main__':
+    main()
